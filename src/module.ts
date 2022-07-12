@@ -5,6 +5,7 @@ import { BaseModuleDeclaration, ExportNamedDeclaration, ImportDeclaration } from
 
 import { Bundle } from './bundle';
 import { Statement } from './statement';
+import { Declaration } from './ast/scope';
 
 export interface ModeleOption {
     id: string;
@@ -25,8 +26,10 @@ export class Module {
     private magicString: MagicString;
 
     private dependencies: Set<string>;
-    private imports: Map<string, {source: string, name: string, module: null | Module}>;
-    private exports: Map<string, {}>;
+    public imports: Map<string, {source: string, name: string, module: null | Module}>;
+    public exports: Map<string, {}>;
+
+    public declarations: Map<string, Declaration>;
 
     constructor(options: ModeleOption) {
         const { id, code, originalCode, ast, bundle } = options;
@@ -41,6 +44,7 @@ export class Module {
         this.dependencies = new Set();
         this.imports = new Map();
         this.exports = new Map();
+        this.declarations = new Map();
 
         this.magicString = new MagicString(code, {
             filename: id,
@@ -148,7 +152,16 @@ export class Module {
             if (statement.getFieldByKey('isImportDeclaration')) this.addImport(statement);
             else if (statement.getFieldByKey('isExportDeclaration')) this.addExport(statement);
             statement.analyse();
-            console.log(statement);
-        })
+
+            statement.scope.eachDeclaration( ( name: string, declaration:Declaration ) => {
+				this.declarations.set(name, declaration);
+			});
+        });
+        console.log(this.declarations);
+    }
+
+    bindImportSpecifiers() {
+        for(const [name, specifiers] of this.imports) {
+        }
     }
 }

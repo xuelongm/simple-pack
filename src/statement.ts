@@ -1,8 +1,13 @@
 import { walk } from "estree-walker";
-import { BaseNode, Literal, BaseCallExpression } from "estree";
+import { BaseNode, Literal, BaseCallExpression, MemberExpression } from "estree";
 import { Declaration, Scope } from "./ast/scope";
 import { Module } from "./module";
 import attachScopes from './ast/attachScopes';
+
+const modifierNodes = {
+	AssignmentExpression: 'left',
+	UpdateExpression: 'argument'
+};
 
 function isReference ( node: any, parent: any ): boolean {
 	if ( node.type === 'MemberExpression' ) {
@@ -24,11 +29,41 @@ function isReference ( node: any, parent: any ): boolean {
 
 		return true;
 	}
-    return true;
+    return false;
 }
 
-class Reference {
-    constructor() {}
+class Reference<T extends BaseNode> {
+    public readonly node: T;
+    public readonly scope: Scope;
+    public declaration: any;
+    public readonly parts: T[];
+    public readonly name: string;
+    public readonly start: number;
+    public readonly end: number;
+
+    public isImmediatelyUsed: boolean;
+    public isReassignment: boolean;
+    constructor(node: T, scope: Scope) {
+        this.node = node;
+        this.scope = scope;
+        this.declaration = null;
+
+        this.parts = [];
+
+        let root: any = node;
+        while(root.type === 'MemberExpression') {
+            this.parts.unshift(root);
+            root = (root as unknown as MemberExpression).object as T;
+        }
+
+        this.isReassignment = false;
+        this.isImmediatelyUsed = false;
+
+        this.name = (root as any).name;
+
+        this.start = root.start;
+        this.end = root.end;
+    }   
 }
 
 function isIife ( node: BaseNode, parent: BaseNode ) {
@@ -43,10 +78,10 @@ export class Statement {
     private isInclude: boolean;
     private isImportDeclaration: boolean;
     private isExportDeclaration: boolean;
-    private readonly scope: Scope;
+    public readonly scope: Scope;
 
     private stringLiteralRanges: [number, number][];
-    private references: Reference[];
+    private references: Reference<BaseNode>[];
 
     constructor(node: BaseNode, module: Module, start: number, end: number) {
         this.node = node;
@@ -95,10 +130,44 @@ export class Statement {
                 }
                 if ( /Function/.test( node.type ) && !isIife( node, parent ) ) readDepth += 1;
 
+                let isReassignment = false;
+                if (parent && parent.type in modifierNodes) {
+                    let subject = (parent as any)[ modifierNodes[parent.type as keyof typeof modifierNodes] ];
+                    let depth = 0;
+                    while(subject.type === 'MemberExpression') {
+                        subject = subject.object;
+                        depth++;
+                    }
+                    const importDeclaration = module.imports.get(subject.name);
+                    if (!scope.contains(subject.name) && importDeclaration) {
+                        const minDepth = importDeclaration.name === '*' ?
+							2 : // cannot do e.g. `namespace.foo = bar`
+							1;
+                        if (depth < minDepth) {
+                            throw new Error(`Illegal reassignment to import '${subject.name}'`)
+                        }
+                    }
 
+                    isReassignment = !depth;
+                }
 
+                if (isReference(node, parent)) {
+                    const referenceScope = parent.type === 'FunctionDeclaration' && node === (parent as any).id ?
+						scope.parent :
+						scope;
+                    const reference = new Reference( node, referenceScope );
+                    references.push( reference );
 
-            }
-        })
+                    reference.isImmediatelyUsed = !readDepth;
+                    reference.isReassignment = isReassignment;
+
+                    this.skip();
+                }
+            },
+            leave ( node, parent ) {
+				if ( (node as any)._scope ) scope = scope.parent;
+				if ( /Function/.test( node.type ) && !isIife( node, parent ) ) readDepth -= 1;
+			}
+        });
     }
 }

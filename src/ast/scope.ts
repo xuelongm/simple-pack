@@ -55,7 +55,7 @@ export interface ScopeOption {
 }
 
 export class Scope {
-    private readonly parent: Scope;
+    public readonly parent: Scope;
     private isBlockScope: boolean;
 
     private readonly declarations: Map<string, Declaration>;
@@ -81,4 +81,9 @@ export class Scope {
             fn(key, value);
         }
 	}
+
+    
+    contains(name: string): any {
+        return this.declarations.get(name) || (this.parent && this.parent.contains(name));
+    }
 }
