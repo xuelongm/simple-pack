@@ -1,6 +1,7 @@
 import { BaseModuleDeclaration } from 'estree';
 import { Identifier, ObjectPattern, AssignmentProperty, RestElement, ArrayPattern, AssignmentPattern } from 'estree';
-import { Statement } from '../statement';
+import { BaseNode } from 'estree-walker';
+import { Reference, Statement } from '../statement';
 
 const extractors = {
 	Identifier ( names: string[], param: Identifier ): void {
@@ -39,13 +40,30 @@ export class Declaration {
     public name: string | null;
     public isReassigned: boolean;
     public aliases: string[];
-    constructor (name: string) {
+    public isExported: boolean;
+    public isUsed: boolean;
+    constructor () {
 		this.statement = null;
-		this.name = name;
+        this.name = null;
 
 		this.isReassigned = false;
 		this.aliases = [];
+        this.isExported = false;
+        this.isUsed = false
 	}
+
+    addReference(reference: Reference<BaseNode>) {
+        reference.declaration = this;
+        this.name = reference.name;
+        if (reference.isReassignment) {
+            this.isReassigned = true;
+        }
+    }
+
+    use() {
+        this.isUsed = true;
+		if ( this.statement ) this.statement.mark();
+    }
 }
 
 export interface ScopeOption {
@@ -71,7 +89,7 @@ export class Scope {
             this.parent.addDeclaration(node, isBlockDeclaration, isVar);
         } else {
             extractNames((node as any).id).forEach(name => {
-                this.declarations.set(name, new Declaration( name ))
+                this.declarations.set(name, new Declaration())
             })
         }
     }
@@ -85,5 +103,9 @@ export class Scope {
     
     contains(name: string): any {
         return this.declarations.get(name) || (this.parent && this.parent.contains(name));
+    }
+
+    findDeclaration(name: string): Declaration | null {
+        return this.declarations.get(name) || (this.parent && this.parent.findDeclaration(name));
     }
 }

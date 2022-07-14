@@ -32,7 +32,7 @@ function isReference ( node: any, parent: any ): boolean {
     return false;
 }
 
-class Reference<T extends BaseNode> {
+export class Reference<T extends BaseNode> {
     public readonly node: T;
     public readonly scope: Scope;
     public declaration: any;
@@ -71,17 +71,17 @@ function isIife ( node: BaseNode, parent: BaseNode ) {
 }
 
 export class Statement {
-    private readonly node: BaseNode;
+    public readonly node: BaseNode;
     private readonly module: Module;
     private readonly start: number;
     private readonly end: number;
-    private isInclude: boolean;
+    private isIncluded: boolean;
     private isImportDeclaration: boolean;
     private isExportDeclaration: boolean;
     public readonly scope: Scope;
 
     private stringLiteralRanges: [number, number][];
-    private references: Reference<BaseNode>[];
+    public references: Reference<BaseNode>[];
 
     constructor(node: BaseNode, module: Module, start: number, end: number) {
         this.node = node;
@@ -90,7 +90,7 @@ export class Statement {
         this.end = end;
 
 
-        this.isInclude = false;
+        this.isIncluded = false;
         this.isImportDeclaration = node.type === 'ImportDeclaration';
         this.isExportDeclaration = /^Export/.test(node.type);
 
@@ -100,7 +100,7 @@ export class Statement {
         this.scope = new Scope();
     }
 
-    public getFieldByKey(key: 'node' | 'node' | 'start' | 'end' | 'isInclude' | 'isImportDeclaration' | 'isExportDeclaration' | 'scope'): BaseNode | Module | number | boolean | Scope {
+    public getFieldByKey(key: 'node' | 'node' | 'start' | 'end' | 'isIncluded' | 'isImportDeclaration' | 'isExportDeclaration' | 'scope'): BaseNode | Module | number | boolean | Scope {
         return this[key];
     }
 
@@ -157,7 +157,6 @@ export class Statement {
 						scope;
                     const reference = new Reference( node, referenceScope );
                     references.push( reference );
-
                     reference.isImmediatelyUsed = !readDepth;
                     reference.isReassignment = isReassignment;
 
@@ -169,5 +168,14 @@ export class Statement {
 				if ( /Function/.test( node.type ) && !isIife( node, parent ) ) readDepth -= 1;
 			}
         });
+    }
+
+    mark() {
+        if ( this.isIncluded ) return;
+        this.isIncluded = true;
+        
+        this.references.forEach( reference => {
+			if ( reference.declaration ) reference.declaration.use();
+		});
     }
 }

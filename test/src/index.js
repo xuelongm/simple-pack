@@ -1,8 +1,10 @@
 import { name } from "./foo";
 
+const aaddcc = '1212';
+
 export function test() {
     let a = 1221;
-    console.log(name);
+    console.log(a);
 }
 
 export function fii() {

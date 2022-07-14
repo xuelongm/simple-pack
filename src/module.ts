@@ -16,7 +16,7 @@ export interface ModeleOption {
 }
 
 export class Module {
-    private readonly id: string;
+    public readonly id: string;
     private readonly code: string;
     private readonly originalCode: string;
     private readonly bundle: Bundle;
@@ -25,9 +25,11 @@ export class Module {
     private statements: Statement[];
     private magicString: MagicString;
 
-    private dependencies: Set<string>;
+    public dependencies: Set<string>;
     public imports: Map<string, {source: string, name: string, module: null | Module}>;
-    public exports: Map<string, {}>;
+    public exports: Map<string, {localName: string}>;
+
+    public resolvedIds: Map<string, string>;
 
     public declarations: Map<string, Declaration>;
 
@@ -45,6 +47,7 @@ export class Module {
         this.imports = new Map();
         this.exports = new Map();
         this.declarations = new Map();
+        this.resolvedIds = new Map();
 
         this.magicString = new MagicString(code, {
             filename: id,
@@ -85,7 +88,6 @@ export class Module {
             // let comment;
             // do {
             //     comment = this.comments[commentIndex];
-            //     console.log(comment);
             //     if (!comment) break;
             //     if (comment.start > (node as any).start) break;
             //     commentIndex++;
@@ -157,11 +159,65 @@ export class Module {
 				this.declarations.set(name, declaration);
 			});
         });
-        console.log(this.declarations);
     }
 
     bindImportSpecifiers() {
-        for(const [name, specifiers] of this.imports) {
+        for(const [_, specifier] of this.imports) {
+            const id = this.resolvedIds.get(specifier.source);
+            specifier.module = this.bundle.moduleById.get(id!)!;
+        }
+    }
+
+    bindAliases() {
+        for(const [name, declaration] of this.declarations) {
+            const { statement } = declaration;
+            for (const reference of statement!.references) {
+                if (reference.name === name || !reference.isImmediatelyUsed) {
+                    continue;
+                }
+                const otherDeclaration = this.trace( reference.name );
+               
+            }
+        }
+    }
+
+    bindReferences() {
+        for (const statement of this.statements) {
+            if (statement.node.type === 'ExportNamedDeclaration' && (statement.node as ExportNamedDeclaration).specifiers.length) {
+                if (this === this.bundle.entryModule) {
+                    return;
+                }
+            }
+
+            statement.references.forEach(reference => {
+                const declaration = reference.scope.findDeclaration(reference.name) || this.trace(reference.name);
+                if (declaration) {
+                    declaration.addReference(reference);
+                } else {
+                    // 全局变量，如console
+
+                    // console.log(reference);
+                }
+                
+            });  
+        }
+    }
+
+    trace(name: string): Declaration | undefined {
+        if (this.declarations.has(name)) {
+            return this.declarations.get(name);
+        }
+        if (this.imports.has(name)) {
+            const declaration = this.imports.get(name)!;
+            const otherModule = declaration.module!;
+            return otherModule.traceExport(name);
+        }
+    }
+
+    traceExport(name: string): Declaration | undefined {
+        const exportDeclaration = this.exports.get(name);
+        if (exportDeclaration) {
+           return this.trace(exportDeclaration.localName);
         }
     }
 }

@@ -4,7 +4,7 @@
   "description": "this is a simple pack",
   "main": "dist/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "ts-node ./test/build.ts",
     "commit": "git-cz"
   },
   "keywords": [],
@@ -12,17 +12,16 @@
   "license": "ISC",
   "devDependencies": {
     "@types/acorn": "^4.0.6",
+    "@types/node": "^18.0.3",
     "git-cz": "^4.9.0",
     "ts-node": "^10.8.2",
     "typescript": "^4.7.4"
   },
   "dependencies": {
-    "@types/node": "^18.0.3",
     "acorn": "^8.7.1",
     "estree-walker": "^2.0.2",
     "magic-string": "^0.26.2"
   },
-
   "config": {
     "commitizen": {
       "path": "git-cz"
