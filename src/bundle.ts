@@ -25,7 +25,6 @@ export class Bundle {
       this.modules.forEach(module => module.bindReferences());
       for(const [name, specifier] of entryModule.exports) {
         const declaration = entryModule.traceExport(name)!;
-        console.log(declaration)
         declaration.isExported = true;
         declaration.use();
       }

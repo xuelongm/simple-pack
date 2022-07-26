@@ -35,7 +35,7 @@ function isReference ( node: any, parent: any ): boolean {
 export class Reference<T extends BaseNode> {
     public readonly node: T;
     public readonly scope: Scope;
-    public declaration: any;
+    public declaration: Declaration | null;
     public readonly parts: T[];
     public readonly name: string;
     public readonly start: number;
@@ -173,7 +173,7 @@ export class Statement {
     mark() {
         if ( this.isIncluded ) return;
         this.isIncluded = true;
-        
+
         this.references.forEach( reference => {
 			if ( reference.declaration ) reference.declaration.use();
 		});
